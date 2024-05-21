@@ -1,0 +1,304 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: emojivoto
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: emoji
+  namespace: emojivoto
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: voting
+  namespace: emojivoto
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: web
+  namespace: emojivoto
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: voting-svc
+  namespace: emojivoto
+spec:
+  selector:
+    app: voting-svc
+    version: v12
+    routed-emoji: any
+  ports:
+    - name: grpc
+      port: 8080
+      targetPort: 8080
+    - name: prom
+      port: 8801
+      targetPort: 8801
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: joy-voting-svc
+  namespace: emojivoto
+spec:
+  type: ClusterIP
+  selector:
+    app: voting-svc
+    version: v12
+    routed-emoji: joy
+  ports:
+    - name: grpc
+      port: 8080
+      targetPort: 8080
+    - name: prom
+      port: 8801
+      targetPort: 8801
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost-voting-svc
+  namespace: emojivoto
+spec:
+  type: ClusterIP
+  selector:
+    app: voting-svc
+    version: v12
+    routed-emoji: ghost
+  ports:
+    - name: grpc
+      port: 8080
+      targetPort: 8080
+    - name: prom
+      port: 8801
+      targetPort: 8801
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: GRPCRoute
+metadata:
+  name: emoji-voting
+  namespace: emojivoto
+  labels:
+    app.kubernetes.io/part-of: emojivoto
+spec:
+  parentRefs:
+    - group: ""
+      kind: Service
+      name: voting-svc
+      port: 8080
+      namespace: emojivoto
+    - group: ""
+      kind: Service
+      name: joy-voting-svc
+      port: 8080
+      namespace: emojivoto
+    - group: ""
+      kind: Service
+      name: ghost-voting-svc
+      port: 8080
+      namespace: emojivoto
+  rules:
+    - matches:
+        - method:
+            method: VoteJoy
+            service: emojivoto.v1.VotingService
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: joy-voting-svc
+          port: 8080
+          namespace: emojivoto
+    - matches:
+        - method:
+            method: VoteGhost
+            service: emojivoto.v1.VotingService
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: ghost-voting-svc
+          port: 8080
+          namespace: emojivoto
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voting-svc
+  namespace: emojivoto
+  labels:
+    app.kubernetes.io/name: emoji
+    app.kubernetes.io/part-of: emojivoto
+    app.kubernetes.io/version: v12
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voting-svc
+      version: v12
+      routed-emoji: any
+  template:
+    metadata:
+      labels:
+        app: voting-svc
+        version: v12
+        routed-emoji: any
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: voting
+      containers:
+        - name: voting-svc
+          image: docker.l5d.io/buoyantio/emojivoto-voting-svc:v12
+          env:
+            - name: GRPC_PORT
+              value: "8080"
+            - name: PROM_PORT
+              value: "8801"
+          ports:
+            - containerPort: 8080
+              name: grpc
+            - containerPort: 8801
+              name: prom
+          resources:
+            requests:
+              cpu: 100m
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: joy-voting
+  namespace: emojivoto
+  labels:
+    app.kubernetes.io/name: voting
+    app.kubernetes.io/part-of: emojivoto
+    app.kubernetes.io/version: v12
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voting-svc
+      version: v12
+      routed-emoji: joy
+  template:
+    metadata:
+      labels:
+        app: voting-svc
+        version: v12
+        routed-emoji: joy
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: voting
+      containers:
+        - name: voting-server
+          image: docker.l5d.io/buoyantio/emojivoto-voting-svc:v12
+          env:
+            - name: GRPC_PORT
+              value: "8080"
+            - name: PROM_PORT
+              value: "8801"
+          ports:
+            - containerPort: 8080
+              name: grpc
+            - containerPort: 8801
+              name: prom
+          resources:
+            requests:
+              cpu: 100m
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghost-voting
+  namespace: emojivoto
+  labels:
+    app.kubernetes.io/name: voting
+    app.kubernetes.io/part-of: emojivoto
+    app.kubernetes.io/version: v12
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voting-svc
+      version: v12
+      routed-emoji: ghost
+  template:
+    metadata:
+      labels:
+        app: voting-svc
+        version: v12
+        routed-emoji: ghost
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: voting
+      containers:
+        - name: voting-server
+          image: docker.l5d.io/buoyantio/emojivoto-voting-svc:v12
+          env:
+            - name: GRPC_PORT
+              value: "8080"
+            - name: PROM_PORT
+              value: "8801"
+          ports:
+            - containerPort: 8080
+              name: grpc
+            - containerPort: 8801
+              name: prom
+          resources:
+            requests:
+              cpu: 100m
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vote-bot
+  namespace: emojivoto
+  labels:
+    app.kubernetes.io/name: voting
+    app.kubernetes.io/part-of: emojivoto
+    app.kubernetes.io/version: v12
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vote-bot
+      version: v12
+  template:
+    metadata:
+      labels:
+        app: vote-bot
+        version: v12
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: voting
+      containers:
+        - name: joy-voter
+          image: docker.io/thewondersmith/emojivoto-grpcroute-demo:latest
+          env:
+            - name: VOTE_FOR
+              value: joy
+          resources:
+            requests:
+              cpu: 100m
+        - name: ghost-voter
+          image: docker.io/thewondersmith/emojivoto-grpcroute-demo:latest
+          env:
+            - name: VOTE_FOR
+              value: ghost
+          resources:
+            requests:
+              cpu: 100m

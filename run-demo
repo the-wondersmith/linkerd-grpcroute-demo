@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+clear && echo -e "\n\n\n\n"
+
+read -n 1 -s -r -p "Press any key to reset local k8s cluster ..." _; echo
+
+echo -e "\nupstall-linkerd --reset\n" && sleep 0.5
+
+upstall-linkerd --reset && echo ""
+
+read -n 1 -s -r -p "Press any key to install linkerd in the local k8s cluster ..." _; echo
+
+echo -e "\nupstall-linkerd --build\n" && sleep 0.5
+
+upstall-linkerd --build && echo ""
+
+read -n 1 -s -r -p "Press any key to deploy the grpcroute demo to the local k8s cluster ..." _; echo
+
+echo -e "\nkubectl apply -f k8s-manifest.yaml\n" && sleep 0.5
+
+kubectl apply -f k8s-manifest.yaml && echo ""
+
+read -n 1 -s -r -p "Press any key to reset the local k8s cluster ..." _; echo
+
+echo -e "\nupstall-linkerd --reset\n" && sleep 0.5
+
+echo -e "\n🎉 demo complete, 🌮's all around 😁"
+
+echo -e "\n$(upstall-linkerd --reset 2> /dev/null 1>&2)\n"
+
